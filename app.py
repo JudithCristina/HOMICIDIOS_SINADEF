@@ -6,10 +6,11 @@ from datetime import datetime, timedelta
 import locale
 
 # Configurar idioma español para fechas
+
 try:
-    locale.setlocale(locale.LC_TIME, 'es_PE.UTF-8')  # Para sistemas configurados en Perú
-except:
-    locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')  # Alternativa general en español
+    locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')  # tu preferencia
+except locale.Error:
+    locale.setlocale(locale.LC_TIME, '')  # fallback al default del sistema (probablemente inglés)
     
 st.set_page_config(page_title="Dashboard de Muertes Violentas", layout="wide")
 
