@@ -3,7 +3,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import altair as alt
 from datetime import datetime, timedelta
+import locale
 
+# Configurar idioma español para fechas
+try:
+    locale.setlocale(locale.LC_TIME, 'es_PE.UTF-8')  # Para sistemas configurados en Perú
+except:
+    locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')  # Alternativa general en español
+    
 st.set_page_config(page_title="Dashboard de Muertes Violentas", layout="wide")
 
 # =====================
@@ -30,7 +37,7 @@ st.markdown("""
     h3 { font-size: 24px !important; }
     h4, label { font-size: 18px !important; }
     p{
-        font-size: 16px!important
+        font-size: 18px!important
     }
     /* Sidebar */
     section[data-testid="stSidebar"] {
@@ -146,6 +153,23 @@ st.markdown("""
 .st-emotion-cache-1dj3ksd {
    background-color: #F39200 !important; 
 }
+h1{
+    padding: 0px !important
+}
+ .fecha-rango {
+        font-size: 28px!important;
+    }
+ .total-muertes {
+        font-size: 45px!important;
+    }
+ .st-emotion-cache-1y9tyez .st-emotion-cache-i0ptax{
+       background: #003366 !important;
+  }
+   /* Cambiar color del título al pasar el mouse (hover) */
+.streamlit-expanderHeader:hover {
+        color: #F39200 !important;  /* Amarillo personalizado */
+    }
+
     </style>
 """, unsafe_allow_html=True)
 
@@ -189,7 +213,7 @@ plt.rcParams.update({
 # =====================
 mes_dict = {1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril', 5: 'Mayo', 6: 'Junio',
             7: 'Julio', 8: 'Agosto', 9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'}
-df_base = pd.read_csv("data/processed/BASE_FINAL_GENERAL.csv")
+df_base = pd.read_csv("https://raw.githubusercontent.com/JudithCristina/sinadef-automatizado/main/data/processed/BASE_FINAL_GENERAL.csv")
 df = pd.DataFrame()
 df["sexo"] = df_base["SEXO"]
 df["edad"] = df_base["EDADES"]
@@ -204,48 +228,81 @@ df["cantidad"] = 1
 # =====================
 with st.sidebar:
     st.markdown("## 🔎 Filtros del Dashboard")
-    sexo_sel = st.multiselect("Sexo", df["sexo"].unique(), default=df["sexo"].unique())
-    causa_sel = st.multiselect("Causa", df["causa_muerte"].unique(), default=df["causa_muerte"].unique())
-    edad_sel = st.multiselect("Grupo etario", df["edad"].unique(), default=df["edad"].unique())
-    meses_sel = st.multiselect("Mes", sorted(df["mes"].unique()), default=sorted(df["mes"].unique()))
-    # 🔽 Nuevo filtro temporal unificado
-    st.markdown("### 🗓️ Filtro temporal")
-    tipo_filtro_tiempo = st.radio("¿Cómo deseas filtrar el tiempo?", ["Por años", "Por rango reciente"])
 
-    if tipo_filtro_tiempo == "Por años":
-        año_inicio, año_fin = st.slider("Año", min_value=int(df["año"].min()), max_value=int(df["año"].max()),
-                                        value=(int(df["año"].min()), int(df["año"].max())), step=1)
-        rango_reciente = None
-    else:
-        rango_reciente = st.selectbox("Selecciona un rango reciente:", [
-            "Última semana", "Último mes", "Últimos 3 meses", "Últimos 6 meses"
-        ])
-        año_inicio, año_fin = None, None
-    tipo_vista = st.radio(
-        "Filtro de visualización de evolución mensual:",
-        ["Total general", "Por causa de muerte"]
-    )
+    with st.expander("🎯 Filtros demográficos", expanded=True):
+        sexo_sel = st.multiselect("Sexo", df["sexo"].unique(), default=df["sexo"].unique())
+        causa_sel = st.multiselect("Causa", df["causa_muerte"].unique(), default=df["causa_muerte"].unique())
+        edad_sel = st.multiselect("Grupo etario", df["edad"].unique(), default=df["edad"].unique())
+        meses_sel = st.multiselect("Mes", sorted(df["mes"].unique()), default=sorted(df["mes"].unique()))
 
+    with st.expander("🗓️ Filtro temporal", expanded=False):
+        tipo_filtro_tiempo = st.radio("¿Cómo deseas filtrar el tiempo?", ["Por años", "Por rango reciente"])
+        if tipo_filtro_tiempo == "Por años":
+            año_inicio, año_fin = st.slider("Año", min_value=int(df["año"].min()),
+                                            max_value=int(df["año"].max()),
+                                            value=(int(df["año"].min()), int(df["año"].max())),
+                                            step=1)
+            rango_reciente = None
+        else:
+            rango_reciente = st.selectbox("Selecciona un rango reciente:", [
+                "Última semana", "Último mes", "Últimos 3 meses", "Últimos 6 meses"
+            ])
+            año_inicio, año_fin = None, None
+
+    with st.expander("📊 Visualización de la evolución de homicidios", expanded=False):
+        tipo_vista = st.radio(
+            "¿Cómo deseas visualizar la evolución de homicidios?",
+            ["Total general", "Por causa del homicidio"]
+        )
+        
 if not sexo_sel or not causa_sel or not edad_sel or not meses_sel:
-    st.warning("⚠️ Por favor, selecciona al menos una opción en todos los filtros.")
+    st.markdown("""
+        <div style="background-color: #FFF3CD; 
+                    border-left: 6px solid #F39200; 
+                    padding: 12px 20px; 
+                    margin-bottom: 20px; 
+                    border-radius: 8px; 
+                    color: #856404; 
+                    font-size: 16px;">
+            ⚠️ <strong>Por favor</strong>, selecciona al menos una opción en todos los filtros.
+        </div>
+    """, unsafe_allow_html=True)
     st.stop()
 
-# Asegurarse que la columna fecha esté en formato datetime
+# =====================
+# APLICAR FILTRO TEMPORAL INTELIGENTE
+# =====================
 df["fecha"] = pd.to_datetime(df["fecha"], errors='coerce')
-
-# Aplicar el filtro temporal según la selección del sidebar
 hoy = pd.Timestamp.today()
+inicio, fin = None, None
+
 if rango_reciente:
+    primer_dia_mes_actual = hoy.replace(day=1)
+
     if rango_reciente == "Última semana":
-        df = df[df["fecha"] >= hoy - timedelta(weeks=1)]
+        # Semana epidemiológica pasada: lunes a domingo anterior
+        lunes_actual = hoy - timedelta(days=hoy.weekday())
+        inicio = lunes_actual - timedelta(days=7)
+        fin = lunes_actual - timedelta(days=1)
+
     elif rango_reciente == "Último mes":
-        df = df[df["fecha"] >= hoy - pd.DateOffset(months=1)]
+        fin = primer_dia_mes_actual - timedelta(days=1)
+        inicio = fin.replace(day=1)
+
     elif rango_reciente == "Últimos 3 meses":
-        df = df[df["fecha"] >= hoy - pd.DateOffset(months=3)]
+        fin = primer_dia_mes_actual - timedelta(days=1)
+        inicio = (primer_dia_mes_actual - pd.DateOffset(months=3)).replace(day=1)
+
     elif rango_reciente == "Últimos 6 meses":
-        df = df[df["fecha"] >= hoy - pd.DateOffset(months=6)]
+        fin = primer_dia_mes_actual - timedelta(days=1)
+        inicio = (primer_dia_mes_actual - pd.DateOffset(months=6)).replace(day=1)
+
+    df = df[(df["fecha"] >= inicio) & (df["fecha"] <= fin)]
+
 else:
     df = df[df["año"].between(año_inicio, año_fin)]
+    inicio = df["fecha"].min()
+    fin = df["fecha"].max()
 # =====================
 # FILTRADO
 # =====================
@@ -257,38 +314,85 @@ df_filtrado = df[
 ]
 total_muertes = df_filtrado["cantidad"].sum()
 
+# Mostrar título adaptado según el tipo de filtro temporal
+# Mostrar título adaptado según el tipo de filtro temporal
+if rango_reciente:
+    if inicio.year == fin.year:
+        if inicio.month == fin.month:
+            # Mismo mes y año: solo mostrar mes
+            titulo_rango = f"{inicio.strftime('%B de %Y')}"
+        else:
+            # Diferentes meses, mismo año
+            titulo_rango = f"{inicio.strftime('%-d de %B')} al {fin.strftime('%-d de %B de %Y')}"
+    else:
+        # Años diferentes
+        titulo_rango = f"{inicio.strftime('%-d de %B de %Y')} al {fin.strftime('%-d de %B de %Y')}"
+else:
+    titulo_rango = f"{año_inicio} - {año_fin}"
+
 st.markdown(f"""
     <div style="display: flex; justify-content: space-between; align-items: center;
                 background-color: #F39200; padding: 20px; border-radius: 10px; margin-bottom: 25px;">
-        <h1 style=" font-size: 40px; margin: 0;">Muertes violentas {año_inicio} - {año_fin}</h1>
+        <div>
+            <h1 style="font-size: 38px; margin: 0; color: #003366;">Homicidios con necropsia registrados en SINADEF</h1>
+            <p class="fecha-rango" style="font-size: 20px; font-style: italic; margin: 4px 0 0 0; color: #003366;">
+                ({titulo_rango})
+            </p>
+        </div>
         <div style="text-align: right;">
-            <p style="color: white; font-size: 25px; margin: 0;">Total de Muertes</p>
-            <p style="color: white; font-size: 40px; font-weight: bold; margin: 0;">{total_muertes:,}</p>
+            <p class="fecha-rango" style="color: white; font-size: 25px; margin: 0;">Número de homicidios:</p>
+            <p class="total-muertes" style="color: white; font-size: 40px; font-weight: bold; margin: 0;">{total_muertes:,}</p>
         </div>
     </div>
 """, unsafe_allow_html=True)
-
 # =====================
 # GRAFICOS
 # =====================
 col_causa, col_edad = st.columns(2)
 
 with col_causa:
-    st.markdown("### Causas de Muerte por Año")
-    causa_año = df_filtrado.groupby(['año', 'causa_muerte'])['cantidad'].sum().reset_index()
-    chart_causa = alt.Chart(causa_año).mark_bar().encode(
-         x=alt.X('año:O',title='Año'),
+    if rango_reciente == "Última semana":
+        st.markdown("### Causas de muerte según día de ocurrencia")
+
+        df_filtrado["tiempo"] = df_filtrado["fecha"].dt.strftime('%A')
+        orden_x = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+
+    elif rango_reciente == "Último mes":
+        st.markdown("### Causas de muerte según día de ocurrencia")
+
+        df_filtrado["tiempo"] = df_filtrado["fecha"].dt.strftime('%d/%m')
+        orden_x = sorted(df_filtrado["tiempo"].unique(), key=lambda x: datetime.strptime(x, '%d/%m'))
+
+    elif rango_reciente in ["Últimos 3 meses", "Últimos 6 meses"]:
+        st.markdown("### Causas de muerte según mes de ocurrencia")
+
+        df_filtrado["tiempo"] = df_filtrado["fecha"].dt.strftime('%B %Y')
+        meses_orden = df_filtrado["fecha"].dt.to_period("M").sort_values().unique()
+        orden_x = [d.strftime('%B %Y') for d in meses_orden.to_timestamp()]
+
+    else:
+        st.markdown("### Causas de muerte según año de ocurrencia")
+
+        df_filtrado["tiempo"] = df_filtrado["año"].astype(str)
+        orden_x = sorted(df_filtrado["tiempo"].unique())
+
+    # Agrupar por tiempo y causa
+    causa_tiempo = df_filtrado.groupby(['tiempo', 'causa_muerte'])['cantidad'].sum().reset_index()
+
+    # Gráfico Altair
+    chart_causa = alt.Chart(causa_tiempo).mark_bar().encode(
+        x=alt.X('tiempo:N', title='Periodo', sort=orden_x),
         y=alt.Y('cantidad:Q', title='Cantidad de muertes'),
-        color=alt.Color('causa_muerte:N', title='Causa',  scale=alt.Scale(range=['#C7E9F1', '#00AEEF', '#005EB8', '#F39200']),
-                        ),
+        color=alt.Color('causa_muerte:N', title='Causa',
+                        scale=alt.Scale(range=['#C7E9F1', '#00AEEF', '#005EB8', '#F39200'])),
         tooltip=[
-             alt.Tooltip('año:O', title='Año'),
+            alt.Tooltip('tiempo:N', title='Periodo'),
             alt.Tooltip('causa_muerte:N', title='Causa'),
             alt.Tooltip('cantidad:Q', title='Cantidad')
         ]
     )
-    st.altair_chart(aplicar_estilo_altair(chart_causa), use_container_width=True)
 
+    st.altair_chart(aplicar_estilo_altair(chart_causa), use_container_width=True)
 
 # Agrupar y luego mapear los nombres amigables
 edad_año = df_filtrado.groupby(['año', 'edad'])['cantidad'].sum().reset_index()
@@ -297,16 +401,46 @@ edad_año = df_filtrado.groupby(['año', 'edad'])['cantidad'].sum().reset_index(
 orden_personalizado = ['Niño', 'Adolescente', 'Joven', 'Adulto', 'Adulto mayor']
 
 with col_edad:
-    st.markdown("### Distribución Etaria por Año")
+    if rango_reciente == "Última semana":
+        st.markdown("### Homicidios por etapas de vida según día")
 
-    chart_edad = alt.Chart(edad_año).mark_bar().encode(
-        x=alt.X('año:O', title='Año'),
+        df_filtrado["tiempo"] = df_filtrado["fecha"].dt.strftime('%A')
+        orden_x = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+
+    elif rango_reciente == "Último mes":
+        st.markdown("### Homicidios por etapas de vida según día")
+
+        df_filtrado["tiempo"] = df_filtrado["fecha"].dt.strftime('%d/%m')
+        orden_x = sorted(df_filtrado["tiempo"].unique(), key=lambda x: datetime.strptime(x, '%d/%m'))
+
+    elif rango_reciente in ["Últimos 3 meses", "Últimos 6 meses"]:
+        st.markdown("### Homicidios por etapas de vida según mes")
+
+        df_filtrado["tiempo"] = df_filtrado["fecha"].dt.strftime('%B %Y')
+        meses_orden = df_filtrado["fecha"].dt.to_period("M").sort_values().unique()
+        orden_x = [d.strftime('%B %Y') for d in meses_orden.to_timestamp()]
+
+    else:
+        st.markdown("### Homicidios por etapas de vida según año")
+
+        df_filtrado["tiempo"] = df_filtrado["año"].astype(str)
+        orden_x = sorted(df_filtrado["tiempo"].unique())
+
+    # Orden personalizado de grupos etarios
+    orden_edad = ['Niño', 'Adolescente', 'Joven', 'Adulto', 'Adulto mayor']
+
+    # Agrupar por tiempo y edad
+    edad_tiempo = df_filtrado.groupby(['tiempo', 'edad'])['cantidad'].sum().reset_index()
+
+    # Gráfico Altair
+    chart_edad = alt.Chart(edad_tiempo).mark_bar().encode(
+        x=alt.X('tiempo:N', title='Periodo', sort=orden_x),
         y=alt.Y('cantidad:Q', title='Cantidad de muertes'),
         color=alt.Color('edad:N', title='Grupo etario',
                         scale=alt.Scale(range=['#005EB8', '#F39200', '#90A4AE', '#00AEEF', '#B2EBF2']),
-                        sort=alt.Sort(orden_personalizado)),
+                        sort=alt.Sort(orden_edad)),
         tooltip=[
-            alt.Tooltip('año:O', title='Año'),
+            alt.Tooltip('tiempo:N', title='Periodo'),
             alt.Tooltip('edad:N', title='Grupo etario'),
             alt.Tooltip('cantidad:Q', title='Cantidad')
         ]
@@ -318,71 +452,71 @@ with col_edad:
 col_linea, col_pie = st.columns([0.70, 0.30])
 
 with col_linea:
-    if tipo_vista == "Total general":
-        st.markdown("### Evolución Mensual de Muertes (Total General)")
+    if tipo_filtro_tiempo == "Por años":
+        df_filtrado["tiempo"] = df_filtrado["fecha"].dt.to_period("M").astype(str)
+        sort_x = sorted(df_filtrado["tiempo"].unique())
+        titulo_linea = "Evolución mensual de homicidios"
+        titulo_linea += " (Total General)" if tipo_vista == "Total general" else " por Causa"
+
     else:
-        st.markdown("### Evolución Mensual de Muertes por Causa")
+        df_filtrado["tiempo"] = df_filtrado["fecha"].dt.strftime('%d/%m')
+        sort_x = sorted(df_filtrado["tiempo"].unique(), key=lambda x: datetime.strptime(x, "%d/%m"))
+        titulo_linea = "Evolución diaria de homicidios"
+        titulo_linea += " (Total General)" if tipo_vista == "Total general" else " por Causa"
 
-    df_filtrado["fecha"] = pd.to_datetime(df_filtrado["fecha"], errors='coerce')
-    df_filtrado["año_mes"] = df_filtrado["fecha"].dt.to_period("M").astype(str)
+    st.markdown(f"### {titulo_linea}")
 
     if tipo_vista == "Total general":
-        evolucion_total = df_filtrado.groupby("año_mes")["cantidad"].sum().reset_index()
+        evolucion = df_filtrado.groupby("tiempo")["cantidad"].sum().reset_index()
 
-        chart_general = alt.Chart(evolucion_total).mark_line(
+        chart = alt.Chart(evolucion).mark_line(
             point=alt.OverlayMarkDef(filled=True, size=60),
             strokeWidth=3,
             color="#00AEEF"
         ).encode(
-            x=alt.X('año_mes:N', title='Año-Mes'),
+            x=alt.X('tiempo:N', title='Periodo', sort=sort_x),
             y=alt.Y('cantidad:Q', title='Cantidad de muertes'),
             tooltip=[
-                alt.Tooltip('año_mes:N', title='Año-Mes'),
-                alt.Tooltip('cantidad:Q', title='Total de muertes')
+                alt.Tooltip('tiempo:N', title='Periodo'),
+                alt.Tooltip('cantidad:Q', title='Muertes')
             ]
         )
-        st.altair_chart(aplicar_estilo_altair(chart_general), use_container_width=True)
 
     else:
-        evolucion_causa = df_filtrado.groupby(['año_mes', 'causa_muerte'])['cantidad'].sum().reset_index()
+        evolucion = df_filtrado.groupby(['tiempo', 'causa_muerte'])['cantidad'].sum().reset_index()
 
-        chart_causas = alt.Chart(evolucion_causa).mark_line(
+        chart = alt.Chart(evolucion).mark_line(
             point=alt.OverlayMarkDef(filled=True, size=50),
             strokeWidth=2
         ).encode(
-            x=alt.X('año_mes:N', title='Año-Mes'),
+            x=alt.X('tiempo:N', title='Periodo', sort=sort_x),
             y=alt.Y('cantidad:Q', title='Cantidad de muertes'),
-            color=alt.Color('causa_muerte:N', title='Causa', scale=alt.Scale(range=['#C7E9F1', '#00AEEF', '#005EB8', '#F39200'])),
+            color=alt.Color('causa_muerte:N', title='Causa',
+                            scale=alt.Scale(range=['#C7E9F1', '#00AEEF', '#005EB8', '#F39200'])),
             tooltip=[
-                alt.Tooltip('año_mes:N', title='Fecha'),
+                alt.Tooltip('tiempo:N', title='Periodo'),
                 alt.Tooltip('causa_muerte:N', title='Causa'),
                 alt.Tooltip('cantidad:Q', title='Muertes')
             ]
         )
-        st.altair_chart(aplicar_estilo_altair(chart_causas), use_container_width=True)
 
+    st.altair_chart(aplicar_estilo_altair(chart), use_container_width=True)
 
 
 with col_pie:
     with st.container():
-        st.markdown("### Distribución por Sexo")
+        st.markdown("### Homicidios según sexo")
 
-        # ✅ Agrupar primero
+        # ✅ Agrupar por sexo directamente
         sexo_data = df_filtrado.groupby('sexo')['cantidad'].sum().reset_index()
 
         if not sexo_data.empty:
-            # ✅ Luego agregar etiquetas personalizadas
-            sexo_data['sexo_etiqueta'] = sexo_data['sexo'].map({
-                'FEMENINO': 'Femenino',
-                'MASCULINO': 'Masculino'
-            })
-
-            # Calcular porcentaje
+            # ✅ Calcular porcentaje
             total = sexo_data['cantidad'].sum()
             sexo_data['porcentaje_val'] = (sexo_data['cantidad'] / total * 100).round(1)
             sexo_data['etiqueta'] = sexo_data['porcentaje_val'].astype(str) + '%'
 
-            # Paleta personalizada
+            # Paleta personalizada (ya con nombres bonitos)
             color_scale = alt.Scale(
                 domain=["Femenino", "Masculino"],
                 range=["#00AEEF", "#F39200"]
@@ -390,9 +524,9 @@ with col_pie:
 
             base = alt.Chart(sexo_data).encode(
                 theta=alt.Theta("cantidad:Q"),
-                color=alt.Color("sexo_etiqueta:N", scale=color_scale, title="Sexo"),
+                color=alt.Color("sexo:N", scale=color_scale, title="Sexo"),
                 tooltip=[
-                    alt.Tooltip("sexo_etiqueta:N", title="Sexo"),
+                    alt.Tooltip("sexo:N", title="Sexo"),
                     alt.Tooltip("cantidad:Q", title="Cantidad"),
                     alt.Tooltip("etiqueta:N", title="Porcentaje")
                 ]
