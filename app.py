@@ -159,6 +159,11 @@ df["mes"] = df_base["MES"].map(mes_dict)
 df["año"] = df_base["ANIO"]
 df["fecha"] = df_base["FECHA"]
 df["cantidad"] = 1
+if "FECHA_DESCARGA" in df_base and "HORA_DESCARGA" in df_base:
+    fecha_dt = pd.to_datetime(df_base["FECHA_DESCARGA"].iloc[0] + " " + df_base["HORA_DESCARGA"].iloc[0])
+    fecha_actualizacion = fecha_dt.strftime("%d de %B de %Y a las %H:%M").capitalize()
+else:
+    fecha_actualizacion = ""
 # =====================
 # SIDEBAR
 # =====================
@@ -851,6 +856,6 @@ st.markdown(f"""
     <div style="margin-top: 40px; text-align: right; font-size: 14px; color: #666;">
         Fuente de datos: <strong>SINADEF - Sistema Informático Nacional de Defunciones</strong><br>
         Para mayor información o consulta, escríbenos a <strong>xxxxxxx@cientifica.edu.pe</strong>.<br>
-        Fecha de actualización: {pd.Timestamp.today().strftime('%d/%m/%Y')}
+        Fecha de actualización: <b>{fecha_actualizacion}</b>
     </div>
     """, unsafe_allow_html=True)    
