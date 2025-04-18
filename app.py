@@ -1,18 +1,24 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import altair as alt
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import locale
+import time
 
 # Configurar idioma español para fechas
-
 try:
-    locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')  # tu preferencia
+    locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
 except locale.Error:
-    locale.setlocale(locale.LC_TIME, '')  # fallback al default del sistema (probablemente inglés)
-    
+    locale.setlocale(locale.LC_TIME, '')
+
 st.set_page_config(page_title="Dashboard de Muertes Violentas", layout="wide")
+
+st.markdown("""
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+""", unsafe_allow_html=True)
 
 # =====================
 # ESTILO DIVULGA AZUL (SIDEBAR) + ACADÉMICO (MAIN)
@@ -33,14 +39,19 @@ st.markdown("""
         color: #003366 !important;
         font-family: 'Inter', sans-serif !important;
     }
-    h1 { font-size: 38px !important; }
+    .st-emotion-cache-ovf5rk{
+        color: #003366 !important;
+    }
+    .st-eb{
+        background-color:#003366!important
+    }
+    h1 { font-size: 30px !important; }
     h2 { font-size: 30px !important; }
-    h3 { font-size: 24px !important; }
+    h3 { font-size: 20px !important; }
     h4, label { font-size: 18px !important; }
     p{
         font-size: 18px!important
     }
-    /* Sidebar */
     section[data-testid="stSidebar"] {
         background-color: #005EB8 !important;
         border-right: 2px solid #00AEEF;
@@ -57,8 +68,6 @@ st.markdown("""
         font-size: 17px !important;
         font-family: 'Inter', sans-serif !important;
     }
-
-    /* Inputs generales */
     .stSelectbox div, .stMultiSelect div, .stTextInput input {
         color: white !important;
         font-weight: 700 !important;
@@ -76,14 +85,11 @@ st.markdown("""
         padding: 6px 14px !important;
         border: none !important;
     }
-
     .stMultiSelect [data-baseweb="select"] > div,
     .stSelectbox [data-baseweb="select"] > div {
         background-color: #004B99 !important;
         border-color: #00AEEF !important;
     }
-
-    /* Radio buttons */
     .stRadio > div > label > div[data-testid="stMarkdownContainer"] > p {
         color: white !important;
         font-weight: bold;
@@ -105,15 +111,12 @@ st.markdown("""
     .stRadio [role="radiogroup"] > div[aria-checked="true"] p {
         color: white !important;
     }
-
-    /* Botones */
     .stButton>button {
         color: white !important;
         background-color: #0079C1 !important;
         font-weight: bold;
         border-radius: 6px;
     }
-
     .stAppHeader {
         background: transparent;
     }
@@ -122,98 +125,31 @@ st.markdown("""
         color: #003366 !important;
         font-family: 'Inter', sans-serif !important;
     }
-    canvas {
-        border-radius: 16px;
-        overflow: hidden;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    .main-svg {
+        background-color: transparent!important;
+        border-radius: 16px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+    .legend{
+        background-color: transparent!important;
+        border-radius: 16px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+    .fecha-rango{
+        font-size: 25px !important;
     }
-    .st-do {
-   linear-gradient(
-    to right,
-    rgba(172, 177, 195, 0.25) 0%,
-    rgba(172, 177, 195, 0.25) 50%,
-    #F39200 50%,
-    #F39200 100%,
-    rgba(172, 177, 195, 0.25) 100%
-) !important;
-}
-.st-eq {
-      linear-gradient(
-    to right,
-    rgba(172, 177, 195, 0.25) 0%,
-    rgba(172, 177, 195, 0.25) 50%,
-    #F39200 50%,
-    #F39200 100%,
-    rgba(172, 177, 195, 0.25) 100%
-) !important;
-}
-.st-emotion-cache-b92z60{
-      color: #F39200 !important; 
-              font-weight: bold;s
-}
-.st-emotion-cache-1dj3ksd {
-   background-color: #F39200 !important; 
-}
-h1{
-    padding: 0px !important
-}
- .fecha-rango {
-        font-size: 28px!important;
+    .total-muertes{
+        font-size: 40px !important;
+        font-weight: bold;
     }
- .total-muertes {
-        font-size: 45px!important;
-    }
- .st-emotion-cache-1y9tyez .st-emotion-cache-i0ptax{
-       background: #003366 !important;
-  }
-   /* Cambiar color del título al pasar el mouse (hover) */
-.streamlit-expanderHeader:hover {
-        color: #F39200 !important;  /* Amarillo personalizado */
-    }
-
     </style>
 """, unsafe_allow_html=True)
-
-# =====================
-# CONFIG ALT STYLE
-# =====================
-def aplicar_estilo_altair(chart):
-    return chart.configure_axis(
-        grid=True,
-        gridColor='#91BFDB',
-        gridOpacity=0.3,
-        labelColor='#003366',
-        titleColor='#003366',
-        labelFontSize=14,
-        titleFontSize=16
-    ).configure_legend(
-        labelColor='#003366',
-        titleColor='#003366',
-        orient='right',
-        labelFontSize=16,
-        titleFontSize=16
-    ).configure_view(
-        stroke=None
-    ).configure_title(
-        color='#003366',
-        fontSize=22,
-        anchor='start'
-    ).properties(
-        background='#ffffff',
-        padding={"left": 10, "top": 10, "right": 10, "bottom": 10}
-    )
-
-plt.rcParams.update({
-    'font.size': 11,
-    'text.color': '#003366',
-    'font.family': 'Segoe UI'
-})
 
 # =====================
 # CARGA BASE
 # =====================
 mes_dict = {1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril', 5: 'Mayo', 6: 'Junio',
-            7: 'Julio', 8: 'Agosto', 9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'}
+                7: 'Julio', 8: 'Agosto', 9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'}
 df_base = pd.read_csv("https://raw.githubusercontent.com/JudithCristina/sinadef-automatizado/main/data/processed/BASE_FINAL_GENERAL.csv")
 df = pd.DataFrame()
 df["sexo"] = df_base["SEXO"]
@@ -223,52 +159,59 @@ df["mes"] = df_base["MES"].map(mes_dict)
 df["año"] = df_base["ANIO"]
 df["fecha"] = df_base["FECHA"]
 df["cantidad"] = 1
-
 # =====================
 # SIDEBAR
 # =====================
 with st.sidebar:
     st.markdown("## 🔎 Filtros del Dashboard")
 
+    # 🎯 Filtros demográficos
     with st.expander("🎯 Filtros demográficos", expanded=True):
-        sexo_sel = st.multiselect("Sexo", df["sexo"].unique(), default=df["sexo"].unique())
-        causa_sel = st.multiselect("Causa", df["causa_muerte"].unique(), default=df["causa_muerte"].unique())
-        edad_sel = st.multiselect("Grupo etario", df["edad"].unique(), default=df["edad"].unique())
-        meses_sel = st.multiselect("Mes", sorted(df["mes"].unique()), default=sorted(df["mes"].unique()))
+        sexo_sel = st.multiselect("Sexo:", df["sexo"].unique(), default=df["sexo"].unique())
+        causa_sel = st.multiselect("Causa de muerte:", df["causa_muerte"].unique(), default=df["causa_muerte"].unique())
+        edad_sel = st.multiselect("Etapas de vida:", df["edad"].unique(), default=df["edad"].unique())
 
-    with st.expander("🗓️ Filtro temporal", expanded=False):
-        tipo_filtro_tiempo = st.radio("¿Cómo deseas filtrar el tiempo?", ["Por años", "Por rango reciente"])
-        if tipo_filtro_tiempo == "Por años":
-            año_inicio, año_fin = st.slider("Año", min_value=int(df["año"].min()),
-                                            max_value=int(df["año"].max()),
-                                            value=(int(df["año"].min()), int(df["año"].max())),
-                                            step=1)
-            rango_reciente = None
-        else:
-            rango_reciente = st.selectbox("Selecciona un rango reciente:", [
-                "Última semana", "Último mes", "Últimos 3 meses", "Últimos 6 meses"
-            ])
-            año_inicio, año_fin = None, None
-
-    with st.expander("📊 Visualización de la evolución de homicidios", expanded=False):
-        tipo_vista = st.radio(
-            "¿Cómo deseas visualizar la evolución de homicidios?",
-            ["Total general", "Por causa del homicidio"]
+    # 📆 Filtros temporales
+    # 📆 Filtros temporales
+    with st.expander("📆 Filtro temporal", expanded=True):
+        tipo_filtro_tiempo = st.radio(
+            "¿Cómo deseas filtrar el tiempo?",
+            ["Por años", "Por rango reciente", "Por calendario"]
         )
-        
-if not sexo_sel or not causa_sel or not edad_sel or not meses_sel:
-    st.markdown("""
-        <div style="background-color: #FFF3CD; 
-                    border-left: 6px solid #F39200; 
-                    padding: 12px 20px; 
-                    margin-bottom: 20px; 
-                    border-radius: 8px; 
-                    color: #856404; 
-                    font-size: 16px;">
-            ⚠️ <strong>Por favor</strong>, selecciona al menos una opción en todos los filtros.
-        </div>
-    """, unsafe_allow_html=True)
-    st.stop()
+
+        if tipo_filtro_tiempo == "Por años":
+            año_inicio, año_fin = st.slider(
+                "Año",
+                min_value=int(df["año"].min()),
+                max_value=int(df["año"].max()),
+                value=(int(df["año"].min()), int(df["año"].max())),
+                step=1
+            )
+            rango_reciente = None
+            fecha_inicio = fecha_fin = None
+
+        elif tipo_filtro_tiempo == "Por rango reciente":
+            rango_reciente = st.selectbox(
+                "Selecciona un rango reciente:",
+                ["Última semana", "Último mes", "Últimos 3 meses", "Últimos 6 meses"]
+            )
+            año_inicio = año_fin = fecha_inicio = fecha_fin = None
+
+        else:  # Por calendario
+            col1, col2 = st.columns(2)
+            hoy = pd.Timestamp.today().date()
+
+            # Calcular lunes y domingo de la semana anterior
+            lunes_actual = hoy - pd.Timedelta(days=hoy.weekday())  # lunes de esta semana
+            fecha_inicio_default = lunes_actual - pd.Timedelta(days=7)  # lunes anterior
+            fecha_fin_default = fecha_inicio_default + pd.Timedelta(days=6)  # domingo anterior
+
+            with col1:
+                fecha_inicio = st.date_input("Fecha de inicio", value=fecha_inicio_default, max_value=hoy)
+            with col2:
+                fecha_fin = st.date_input("Fecha de fin", value=fecha_fin_default, min_value=fecha_inicio, max_value=hoy)
+
+            año_inicio = año_fin = rango_reciente = None
 
 # =====================
 # APLICAR FILTRO TEMPORAL INTELIGENTE
@@ -277,7 +220,26 @@ df["fecha"] = pd.to_datetime(df["fecha"], errors='coerce')
 hoy = pd.Timestamp.today()
 inicio, fin = None, None
 
-if rango_reciente:
+# Guardar una copia del DataFrame original antes de aplicar filtros
+df_original = df.copy()
+
+if tipo_filtro_tiempo == "Por calendario":
+    # Caso para filtro por calendario
+    inicio = pd.to_datetime(fecha_inicio)
+    fin = pd.to_datetime(fecha_fin)
+    # Incluir todo el día final
+    fin = fin + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+    
+    # Verificar si hay datos en el rango
+    registros_rango = df[(df["fecha"] >= inicio) & (df["fecha"] <= fin)].shape[0]
+    
+    if registros_rango > 0:
+        df = df[(df["fecha"] >= inicio) & (df["fecha"] <= fin)]
+    else:
+        # Mantener el DataFrame original para que los otros filtros puedan aplicarse
+        df = df_original
+
+elif rango_reciente:
     primer_dia_mes_actual = hoy.replace(day=1)
 
     if rango_reciente == "Última semana":
@@ -300,100 +262,217 @@ if rango_reciente:
 
     df = df[(df["fecha"] >= inicio) & (df["fecha"] <= fin)]
 
-else:
-    df = df[df["año"].between(año_inicio, año_fin)]
-    inicio = df["fecha"].min()
-    fin = df["fecha"].max()
+else:  # Por años
+    if año_inicio is not None and año_fin is not None:
+        df = df[df["año"].between(año_inicio, año_fin)]
+        inicio = df["fecha"].min()
+        fin = df["fecha"].max()
+    else:
+        # Si año_inicio o año_fin son None, mantener todos los datos
+        st.warning("⚠️ Por favor selecciona un rango de años válido.")
+        df = df_original
 # =====================
 # FILTRADO
 # =====================
-df_filtrado = df[
-    (df["sexo"].isin(sexo_sel)) &
-    (df["causa_muerte"].isin(causa_sel)) &
-    (df["edad"].isin(edad_sel)) &
-    (df["mes"].isin(meses_sel))
-]
+if tipo_filtro_tiempo == "Por calendario":
+    fecha_inicio_dt = pd.to_datetime(fecha_inicio)
+    fecha_fin_dt = pd.to_datetime(fecha_fin)
+    
+    df_filtrado = df[
+        (df["sexo"].isin(sexo_sel)) &
+        (df["causa_muerte"].isin(causa_sel)) &
+        (df["edad"].isin(edad_sel)) &
+        (df["fecha"] >= fecha_inicio_dt) &
+        (df["fecha"] <= fecha_fin_dt) 
+    ]
+else:
+    df_filtrado = df[
+        (df["sexo"].isin(sexo_sel)) &
+        (df["causa_muerte"].isin(causa_sel)) &
+        (df["edad"].isin(edad_sel))
+    ]
 total_muertes = df_filtrado["cantidad"].sum()
 
 # Mostrar título adaptado según el tipo de filtro temporal
-# Mostrar título adaptado según el tipo de filtro temporal
-if rango_reciente:
-    if inicio.year == fin.year:
+if tipo_filtro_tiempo == "Por calendario":
+    if fecha_inicio == fecha_fin:
+        titulo_rango = f"{fecha_inicio.strftime('%d/%m/%Y')}"
+    elif fecha_inicio.year == fecha_fin.year:
+        if fecha_inicio.month == fecha_fin.month:
+            titulo_rango = f"{fecha_inicio.strftime('%d')} al {fecha_fin.strftime('%d de %B de %Y')}"
+        else:
+            titulo_rango = f"{fecha_inicio.strftime('%d de %B')} al {fecha_fin.strftime('%d de %B de %Y')}"
+    else:
+        titulo_rango = f"{fecha_inicio.strftime('%d/%m/%Y')} al {fecha_fin.strftime('%d/%m/%Y')}"
+        
+elif rango_reciente:
+    if rango_reciente == "Última semana":
+        titulo_rango = f"{inicio.strftime('%A %d de %B de %Y')} al {fin.strftime('%A %d de %B de %Y')}"
+    elif inicio.year == fin.year:
         if inicio.month == fin.month:
-            # Mismo mes y año: solo mostrar mes
             titulo_rango = f"{inicio.strftime('%B de %Y')}"
         else:
-            # Diferentes meses, mismo año
             titulo_rango = f"{inicio.strftime('%-d de %B')} al {fin.strftime('%-d de %B de %Y')}"
     else:
-        # Años diferentes
         titulo_rango = f"{inicio.strftime('%-d de %B de %Y')} al {fin.strftime('%-d de %B de %Y')}"
 else:
     titulo_rango = f"{año_inicio} - {año_fin}"
-
+    
 st.markdown(f"""
     <div style="display: flex; justify-content: space-between; align-items: center;
                 background-color: #F39200; padding: 20px; border-radius: 10px; margin-bottom: 25px;">
         <div>
-            <h1 style="font-size: 38px; margin: 0; color: #003366;">Homicidios con necropsia registrados en SINADEF</h1>
-            <p class="fecha-rango" style="font-size: 20px; font-style: italic; margin: 4px 0 0 0; color: #003366;">
+            <h1  style=" margin: 0px; color: #003366; padding: 0px">Homicidios con necropsia registrados en SINADEF</h1>
+            <p class="fecha-rango" style=" font-style: italic; margin: 0; color: #003366;">
                 ({titulo_rango})
             </p>
         </div>
         <div style="text-align: right;">
-            <p class="fecha-rango" style="color: white; font-size: 25px; margin: 0;">Número de homicidios:</p>
+            <p class="fecha-rango" style="color: white;  margin: 0;">Número de homicidios:</p>
             <p class="total-muertes" style="color: white; font-size: 40px; font-weight: bold; margin: 0;">{total_muertes:,}</p>
         </div>
     </div>
 """, unsafe_allow_html=True)
+
 # =====================
 # GRAFICOS
 # =====================
 col_causa, col_edad = st.columns(2)
 
 with col_causa:
-    if rango_reciente == "Última semana":
-        st.markdown("### Causas de muerte según día de ocurrencia")
+    if tipo_filtro_tiempo == "Por calendario":
+        st.markdown("### Causas de muerte según periodo seleccionado")
 
+        # Convertir fechas
+        fecha_inicio_dt = pd.to_datetime(fecha_inicio)
+        fecha_fin_dt = pd.to_datetime(fecha_fin)
+
+        df_filtrado_calendario = df[
+            (df["fecha"] >= fecha_inicio_dt) &
+            (df["fecha"] <= fecha_fin_dt) &
+            (df["sexo"].isin(sexo_sel)) &
+            (df["causa_muerte"].isin(causa_sel)) &
+            (df["edad"].isin(edad_sel))
+        ].copy()
+        if df_filtrado_calendario.empty:
+            st.markdown("""
+            <div style="background-color: #FFEBE6; border-left: 5px solid #FF6F61; padding: 12px; border-radius: 8px; color: #8B0000; font-weight: 600;">
+                ⚠️ No hay datos disponibles para el filtro seleccionado.
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            if fecha_inicio_dt.year != fecha_fin_dt.year:
+                # Visualizar por año
+                df_filtrado_calendario["tiempo"] = df_filtrado_calendario["fecha"].dt.year.astype(str)
+                orden_x = sorted(df_filtrado_calendario["tiempo"].unique())
+
+            elif fecha_inicio_dt.month != fecha_fin_dt.month:
+                # Visualizar por mes
+                df_filtrado_calendario["tiempo"] = df_filtrado_calendario["fecha"].dt.strftime('%B %Y')
+                orden_x = sorted(
+                    df_filtrado_calendario["fecha"].dt.to_period("M").drop_duplicates().sort_values()
+                    .dt.to_timestamp().dt.strftime('%B %Y').tolist(),
+                    key=lambda x: datetime.strptime(x, '%B %Y')
+                )
+
+            else:
+                # Visualizar por día
+                df_filtrado_calendario["tiempo"] = df_filtrado_calendario["fecha"].dt.strftime('%d/%m/%Y')
+                orden_x = sorted(df_filtrado_calendario["tiempo"].unique(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'))
+
+            causa_tiempo = df_filtrado_calendario.groupby(['tiempo', 'causa_muerte'])['cantidad'].sum().reset_index()
+
+    elif rango_reciente == "Última semana":
+        st.markdown("### Causas de muerte según día de ocurrencia")
         df_filtrado["tiempo"] = df_filtrado["fecha"].dt.strftime('%A')
         orden_x = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+        causa_tiempo = df_filtrado.groupby(['tiempo', 'causa_muerte'])['cantidad'].sum().reset_index()
+
+        causas_completas = causa_tiempo["causa_muerte"].unique()
+        index_completo = pd.MultiIndex.from_product(
+            [orden_x, causas_completas],
+            names=["tiempo", "causa_muerte"]
+        )
+        causa_tiempo = (
+            causa_tiempo
+            .set_index(["tiempo", "causa_muerte"])
+            .reindex(index_completo, fill_value=0)
+            .reset_index()
+        )
 
     elif rango_reciente == "Último mes":
         st.markdown("### Causas de muerte según día de ocurrencia")
-
         df_filtrado["tiempo"] = df_filtrado["fecha"].dt.strftime('%d/%m')
         orden_x = sorted(df_filtrado["tiempo"].unique(), key=lambda x: datetime.strptime(x, '%d/%m'))
+        causa_tiempo = df_filtrado.groupby(['tiempo', 'causa_muerte'])['cantidad'].sum().reset_index()
 
     elif rango_reciente in ["Últimos 3 meses", "Últimos 6 meses"]:
         st.markdown("### Causas de muerte según mes de ocurrencia")
-
         df_filtrado["tiempo"] = df_filtrado["fecha"].dt.strftime('%B %Y')
         meses_orden = df_filtrado["fecha"].dt.to_period("M").sort_values().unique()
         orden_x = [d.strftime('%B %Y') for d in meses_orden.to_timestamp()]
+        causa_tiempo = df_filtrado.groupby(['tiempo', 'causa_muerte'])['cantidad'].sum().reset_index()
 
     else:
         st.markdown("### Causas de muerte según año de ocurrencia")
-
         df_filtrado["tiempo"] = df_filtrado["año"].astype(str)
         orden_x = sorted(df_filtrado["tiempo"].unique())
+        causa_tiempo = df_filtrado.groupby(['tiempo', 'causa_muerte'])['cantidad'].sum().reset_index()
 
-    # Agrupar por tiempo y causa
-    causa_tiempo = df_filtrado.groupby(['tiempo', 'causa_muerte'])['cantidad'].sum().reset_index()
+    # Solo si existe causa_tiempo
+    if 'causa_tiempo' in locals() and not causa_tiempo.empty:
+        causas_unicas = causa_tiempo['causa_muerte'].unique()
+        colores_causa = ['#90A4AE', '#00AEEF', '#005EB8', '#F39200']
+        color_map = {causa: colores_causa[i % len(colores_causa)] for i, causa in enumerate(causas_unicas)}
 
-    # Gráfico Altair
-    chart_causa = alt.Chart(causa_tiempo).mark_bar().encode(
-        x=alt.X('tiempo:N', title='Periodo', sort=orden_x),
-        y=alt.Y('cantidad:Q', title='Cantidad de muertes'),
-        color=alt.Color('causa_muerte:N', title='Causa',
-                        scale=alt.Scale(range=['#C7E9F1', '#00AEEF', '#005EB8', '#F39200'])),
-        tooltip=[
-            alt.Tooltip('tiempo:N', title='Periodo'),
-            alt.Tooltip('causa_muerte:N', title='Causa'),
-            alt.Tooltip('cantidad:Q', title='Cantidad')
-        ]
-    )
+        fig_causa = px.bar(
+            causa_tiempo,
+            x='tiempo',
+            y='cantidad',
+            color='causa_muerte',
+            labels={
+                'tiempo': 'Periodo',
+                'cantidad': 'Número de Homicidios',
+                'causa_muerte': 'Causa de muerte'
+            },
+            category_orders={'tiempo': orden_x},
+            color_discrete_map=color_map,
+            height=350
+        )
 
-    st.altair_chart(aplicar_estilo_altair(chart_causa), use_container_width=True)
+        fig_causa.update_layout(
+            paper_bgcolor='white',
+            plot_bgcolor='white',
+            font=dict(family='Inter, sans-serif', color='#003366'),
+            margin=dict(t=30, r=10, b=50, l=50),
+            xaxis=dict(
+                title_font=dict(size=16, color='#003366'),
+                tickfont=dict(size=12, color='#003366'),
+                gridcolor='rgba(145, 191, 219, 0.3)',
+                gridwidth=1,
+                tickangle=-45,
+                tickmode='linear'
+            ),
+            yaxis=dict(
+                title_font=dict(size=16, color='#003366'),
+                tickfont=dict(size=12, color='#003366'),
+                gridcolor='rgba(145, 191, 219, 0.3)',
+                gridwidth=1,
+            ),
+            legend=dict(
+                title_font=dict(size=16, color='#003366'),
+                font=dict(size=14, color='#003366'),
+                bgcolor='#F0F2F5',
+            )
+        )
+
+        st.plotly_chart(fig_causa, use_container_width=True)
+    elif tipo_filtro_tiempo != "Por calendario":
+        st.markdown("""
+            <div style="background-color: #FFEBE6; border-left: 5px solid #FF6F61; padding: 12px; border-radius: 8px; color: #8B0000; font-weight: 600;">
+                ⚠️ No hay datos disponibles para el filtro seleccionado.
+            </div>
+            """, unsafe_allow_html=True)
 
 # Agrupar y luego mapear los nombres amigables
 edad_año = df_filtrado.groupby(['año', 'edad'])['cantidad'].sum().reset_index()
@@ -402,160 +481,376 @@ edad_año = df_filtrado.groupby(['año', 'edad'])['cantidad'].sum().reset_index(
 orden_personalizado = ['Niño', 'Adolescente', 'Joven', 'Adulto', 'Adulto mayor']
 
 with col_edad:
-    if rango_reciente == "Última semana":
-        st.markdown("### Homicidios por etapas de vida según día")
+    if tipo_filtro_tiempo == "Por calendario":
+        st.markdown("### Homicidios por etapas de vida según periodo seleccionado")        
 
+        fecha_inicio_dt = pd.to_datetime(fecha_inicio)
+        fecha_fin_dt = pd.to_datetime(fecha_fin)
+
+        df_filtrado_calendario = df[
+            (df["fecha"] >= fecha_inicio_dt) &
+            (df["fecha"] <= fecha_fin_dt) &
+            (df["sexo"].isin(sexo_sel)) &
+            (df["causa_muerte"].isin(causa_sel)) &
+            (df["edad"].isin(edad_sel))
+        ].copy()
+
+        if df_filtrado_calendario.empty:
+            st.markdown("""
+            <div style="background-color: #FFEBE6; border-left: 5px solid #FF6F61; padding: 12px; border-radius: 8px; color: #8B0000; font-weight: 600;">
+                ⚠️ No hay datos disponibles para el filtro seleccionado.
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            if fecha_inicio_dt.year != fecha_fin_dt.year:
+                df_filtrado_calendario["tiempo"] = df_filtrado_calendario["fecha"].dt.year.astype(str)
+                orden_x = sorted(df_filtrado_calendario["tiempo"].unique())
+            elif fecha_inicio_dt.month != fecha_fin_dt.month:
+                df_filtrado_calendario["tiempo"] = df_filtrado_calendario["fecha"].dt.strftime('%B %Y')
+                orden_x = sorted(
+                    df_filtrado_calendario["fecha"].dt.to_period("M").drop_duplicates().sort_values()
+                    .dt.to_timestamp().dt.strftime('%B %Y').tolist(),
+                    key=lambda x: datetime.strptime(x, '%B %Y')
+                )
+            else:
+                df_filtrado_calendario["tiempo"] = df_filtrado_calendario["fecha"].dt.strftime('%d/%m/%Y')
+                orden_x = sorted(df_filtrado_calendario["tiempo"].unique(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'))
+
+            edad_tiempo = df_filtrado_calendario.groupby(['tiempo', 'edad'])['cantidad'].sum().reset_index()
+
+            edades_presentes = df_filtrado_calendario["edad"].unique()
+            index_completo = pd.MultiIndex.from_product(
+                [orden_x, edades_presentes],
+                names=["tiempo", "edad"]
+            )
+
+            edad_tiempo = (
+                edad_tiempo
+                .set_index(["tiempo", "edad"])
+                .reindex(index_completo, fill_value=0)
+                .reset_index()
+            )
+    elif rango_reciente == "Última semana":
+        st.markdown("### Homicidios por etapas de vida según día")
+        
         df_filtrado["tiempo"] = df_filtrado["fecha"].dt.strftime('%A')
         orden_x = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
-
+        
+        # 🔹 NUEVO: asegurar que todos los días y edades estén representados
+        edad_tiempo = df_filtrado.groupby(['tiempo', 'edad'])['cantidad'].sum().reset_index()
+        
+        edades_presentes = edad_tiempo["edad"].unique()
+        index_completo = pd.MultiIndex.from_product(
+            [orden_x, edades_presentes],
+            names=["tiempo", "edad"]
+        )
+        
+        edad_tiempo = (
+            edad_tiempo
+            .set_index(["tiempo", "edad"])
+            .reindex(index_completo, fill_value=0)
+            .reset_index()
+        )
+    
     elif rango_reciente == "Último mes":
         st.markdown("### Homicidios por etapas de vida según día")
-
+        
         df_filtrado["tiempo"] = df_filtrado["fecha"].dt.strftime('%d/%m')
         orden_x = sorted(df_filtrado["tiempo"].unique(), key=lambda x: datetime.strptime(x, '%d/%m'))
-
+        edad_tiempo = df_filtrado.groupby(['tiempo', 'edad'])['cantidad'].sum().reset_index()
+    
     elif rango_reciente in ["Últimos 3 meses", "Últimos 6 meses"]:
         st.markdown("### Homicidios por etapas de vida según mes")
-
+        
         df_filtrado["tiempo"] = df_filtrado["fecha"].dt.strftime('%B %Y')
         meses_orden = df_filtrado["fecha"].dt.to_period("M").sort_values().unique()
         orden_x = [d.strftime('%B %Y') for d in meses_orden.to_timestamp()]
-
+        edad_tiempo = df_filtrado.groupby(['tiempo', 'edad'])['cantidad'].sum().reset_index()
+    
     else:
         st.markdown("### Homicidios por etapas de vida según año")
-
+        
         df_filtrado["tiempo"] = df_filtrado["año"].astype(str)
         orden_x = sorted(df_filtrado["tiempo"].unique())
+        edad_tiempo = df_filtrado.groupby(['tiempo', 'edad'])['cantidad'].sum().reset_index()
+    # Continúa con el código para crear y mostrar el gráfico, solo si edad_tiempo existe y tiene datos
+    if 'edad_tiempo' in locals() and not edad_tiempo.empty:
+        orden_edad = ['Niño', 'Adolescente', 'Joven', 'Adulto', 'Adulto mayor']
 
-    # Orden personalizado de grupos etarios
-    orden_edad = ['Niño', 'Adolescente', 'Joven', 'Adulto', 'Adulto mayor']
+        fig_edad = px.bar(
+            edad_tiempo,
+            x='tiempo',
+            y='cantidad',
+            color='edad',
+            labels={
+                'tiempo': 'Periodo',
+                'cantidad': 'Número de Homicidios',
+                'edad': 'Etapas de vida'
+            },
+            category_orders={'tiempo': orden_x},
+            color_discrete_map={
+                'Niño': '#005EB8',
+                'Adolescente': '#F39200',
+                'Joven': '#90A4AE',
+                'Adulto': '#00AEEF',
+                'Adulto mayor': '#B2EBF2'
+            },
+            height=350
+        )
 
-    # Agrupar por tiempo y edad
-    edad_tiempo = df_filtrado.groupby(['tiempo', 'edad'])['cantidad'].sum().reset_index()
-
-    # Gráfico Altair
-    chart_edad = alt.Chart(edad_tiempo).mark_bar().encode(
-        x=alt.X('tiempo:N', title='Periodo', sort=orden_x),
-        y=alt.Y('cantidad:Q', title='Cantidad de muertes'),
-        color=alt.Color('edad:N', title='Grupo etario',
-                        scale=alt.Scale(range=['#005EB8', '#F39200', '#90A4AE', '#00AEEF', '#B2EBF2']),
-                        sort=alt.Sort(orden_edad)),
-        tooltip=[
-            alt.Tooltip('tiempo:N', title='Periodo'),
-            alt.Tooltip('edad:N', title='Grupo etario'),
-            alt.Tooltip('cantidad:Q', title='Cantidad')
-        ]
-    )
-
-    st.altair_chart(aplicar_estilo_altair(chart_edad), use_container_width=True)
-
+        fig_edad.update_layout(
+            paper_bgcolor='white',
+            plot_bgcolor='white',
+            font=dict(family='Inter, sans-serif', color='#003366'),
+            margin=dict(t=30, r=10, b=50, l=50),
+            xaxis=dict(
+                title_font=dict(size=16, color='#003366'),
+                tickfont=dict(size=12, color='#003366'),
+                gridcolor='rgba(145, 191, 219, 0.3)',
+                gridwidth=1,
+                tickangle=-45,
+                tickmode='linear'
+            ),
+            yaxis=dict(
+                title_font=dict(size=16, color='#003366'),
+                tickfont=dict(size=12, color='#003366'),
+                gridcolor='rgba(145, 191, 219, 0.3)',
+                gridwidth=1,
+            ),
+            legend=dict(
+                title_font=dict(size=16, color='#003366'),
+                font=dict(size=14, color='#003366'),
+                bgcolor='#F0F2F5',
+            )
+        )
+        st.plotly_chart(fig_edad, use_container_width=True)
+    elif tipo_filtro_tiempo != "Por calendario":
+        st.markdown("""
+            <div style="background-color: #FFEBE6; border-left: 5px solid #FF6F61; padding: 12px; border-radius: 8px; color: #8B0000; font-weight: 600;">
+                ⚠️ No hay datos disponibles para el filtro seleccionado.
+            </div>
+            """, unsafe_allow_html=True)
 
 col_linea, col_pie = st.columns([0.70, 0.30])
 
 with col_linea:
-    if tipo_filtro_tiempo == "Por años":
-        df_filtrado["tiempo"] = df_filtrado["fecha"].dt.to_period("M").astype(str)
-        sort_x = sorted(df_filtrado["tiempo"].unique())
-        titulo_linea = "Evolución mensual de homicidios"
-        titulo_linea += " (Total General)" if tipo_vista == "Total general" else " por Causa"
+    import locale
+    locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
 
-    else:
-        df_filtrado["tiempo"] = df_filtrado["fecha"].dt.strftime('%d/%m')
-        sort_x = sorted(df_filtrado["tiempo"].unique(), key=lambda x: datetime.strptime(x, "%d/%m"))
+    col_titulo, col_toggle = st.columns([0.65, 0.35])
+    with col_titulo:
         titulo_linea = "Evolución diaria de homicidios"
-        titulo_linea += " (Total General)" if tipo_vista == "Total general" else " por Causa"
+        eje_x = 'tiempo'
+        tickmode = None
+        tickformat = '%d/%m/%Y'
 
-    st.markdown(f"### {titulo_linea}")
+        if tipo_filtro_tiempo == "Por calendario":
+            fecha_inicio_dt = pd.to_datetime(fecha_inicio)
+            fecha_fin_dt = pd.to_datetime(fecha_fin)
+            if fecha_inicio_dt.year != fecha_fin_dt.year:
+                df_filtrado["tiempo"] = df_filtrado["fecha"].dt.to_period("M").astype(str)
+                titulo_linea = "Evolución mensual de homicidios"
+                tickformat = '%m/%Y'
+            else:
+                df_filtrado["tiempo"] = pd.to_datetime(df_filtrado["fecha"])
+                tickformat = '%d/%m/%Y'
 
-    if tipo_vista == "Total general":
-        evolucion = df_filtrado.groupby("tiempo")["cantidad"].sum().reset_index()
+        elif tipo_filtro_tiempo == "Por años":
+            df_filtrado["tiempo"] = df_filtrado["fecha"].dt.to_period("M").astype(str)
+            titulo_linea = "Evolución mensual de homicidios"
+            tickformat = '%m/%Y'
+        else:
+            df_filtrado["tiempo"] = pd.to_datetime(df_filtrado["fecha"])
+            if rango_reciente in ["Última semana", "Último mes"]:
+                tickmode = 'linear'
 
-        chart = alt.Chart(evolucion).mark_line(
-            point=alt.OverlayMarkDef(filled=True, size=60),
-            strokeWidth=3,
-            color="#00AEEF"
-        ).encode(
-            x=alt.X('tiempo:N', title='Periodo', sort=sort_x),
-            y=alt.Y('cantidad:Q', title='Cantidad de muertes'),
-            tooltip=[
-                alt.Tooltip('tiempo:N', title='Periodo'),
-                alt.Tooltip('cantidad:Q', title='Muertes')
-            ]
-        )
+        st.markdown(f"### {titulo_linea}")
 
+    with col_toggle:
+        st.markdown("""
+        <style>
+        div[data-testid=\"stToggle\"] label {
+            background-color: #00AEEF !important;
+            color: white !important;
+            padding: 6px 16px !important;
+            border-radius: 12px !important;
+            font-weight: 600 !important;
+            box-shadow: 0px 2px 5px rgba(0,0,0,0.15);
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        tipo_vista_toggle = st.toggle("Mostrar por causa de muerte", value=False)
+        tipo_vista = "Por causa de muerte" if tipo_vista_toggle else "Total general"
+
+    if df_filtrado.empty:
+        st.markdown("""
+        <div style=\"background-color: #FFEBE6; border-left: 5px solid #FF6F61; padding: 12px; border-radius: 8px; color: #8B0000; font-weight: 600;\">
+            ⚠️ No hay datos disponibles para el filtro seleccionado.
+        </div>
+        """, unsafe_allow_html=True)
     else:
-        evolucion = df_filtrado.groupby(['tiempo', 'causa_muerte'])['cantidad'].sum().reset_index()
+        if tipo_vista == "Total general":
+            evolucion = df_filtrado.groupby("tiempo")["cantidad"].sum().reset_index()
+        else:
+            evolucion = df_filtrado.groupby(['tiempo', 'causa_muerte'])['cantidad'].sum().reset_index()
 
-        chart = alt.Chart(evolucion).mark_line(
-            point=alt.OverlayMarkDef(filled=True, size=50),
-            strokeWidth=2
-        ).encode(
-            x=alt.X('tiempo:N', title='Periodo', sort=sort_x),
-            y=alt.Y('cantidad:Q', title='Cantidad de muertes'),
-            color=alt.Color('causa_muerte:N', title='Causa',
-                            scale=alt.Scale(range=['#C7E9F1', '#00AEEF', '#005EB8', '#F39200'])),
-            tooltip=[
-                alt.Tooltip('tiempo:N', title='Periodo'),
-                alt.Tooltip('causa_muerte:N', title='Causa'),
-                alt.Tooltip('cantidad:Q', title='Muertes')
-            ]
-        )
+        if evolucion.empty:
+            st.markdown("""
+            <div style=\"background-color: #FFEBE6; border-left: 5px solid #FF6F61; padding: 12px; border-radius: 8px; color: #8B0000; font-weight: 600;\">
+                ⚠️ No hay datos disponibles para el filtro seleccionado.
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            mostrar_valores = False
+            if tipo_filtro_tiempo == "Por años" and año_inicio == año_fin:
+                mostrar_valores = True
+                evolucion['tiempo'] = pd.to_datetime(evolucion['tiempo'], format='%Y-%m').dt.strftime('%B %Y').str.capitalize()
 
-    st.altair_chart(aplicar_estilo_altair(chart), use_container_width=True)
+            # Asegurar que solo se usen etiquetas para los puntos existentes
+            tickvals = evolucion['tiempo'].tolist() if tipo_filtro_tiempo == "Por años" and año_inicio == año_fin else None
+
+            if tipo_vista == "Total general":
+                fig_evolucion = px.line(
+                    evolucion,
+                    x='tiempo',
+                    y='cantidad',
+                    labels={'tiempo': 'Periodo', 'cantidad': 'Número de Homicidios'},
+                    height=350
+                )
+                fig_evolucion.update_traces(
+                    line_color='#00AEEF',
+                    line_width=1,
+                    mode='lines+markers' + ('+text' if mostrar_valores else ''),
+                    marker=dict(size=7, color='#00AEEF'),
+                    text=evolucion['cantidad'] if mostrar_valores else None,
+                    textposition="bottom center"
+                )
+            else:
+                causas_unicas = evolucion['causa_muerte'].unique()
+                colores_causa = ['#90A4AE', '#00AEEF', '#005EB8', '#F39200']
+                color_map = {causa: colores_causa[i % len(colores_causa)] for i, causa in enumerate(causas_unicas)}
+
+                fig_evolucion = px.line(
+                    evolucion,
+                    x='tiempo',
+                    y='cantidad',
+                    color='causa_muerte',
+                    labels={
+                        'tiempo': 'Periodo',
+                        'cantidad': 'Número de Homicidios',
+                        'causa_muerte': 'Causa'
+                    },
+                    color_discrete_map=color_map,
+                    height=350
+                )
+                fig_evolucion.update_traces(
+                    mode='lines+markers' + ('+text' if mostrar_valores else ''),
+                    marker=dict(size=7),
+                    line_width=1,
+                )
+
+            fig_evolucion.update_layout(
+                paper_bgcolor='white',
+                plot_bgcolor='white',
+                font=dict(family='Inter, sans-serif', color='#003366'),
+                margin=dict(t=30, r=10, b=50, l=50),
+                xaxis=dict(
+                    tickformat=tickformat,
+                    title='Periodo',
+                    tickmode='array' if tickvals else tickmode,
+                    tickvals=tickvals,
+                    tickangle=-65,
+                    tickfont=dict(size=14, color='#003366'),
+                    gridcolor='rgba(145, 191, 219, 0.3)',
+                    gridwidth=1
+                ),
+                yaxis=dict(
+                    rangemode='tozero',
+                    title_font=dict(size=16, color='#003366'),
+                    tickfont=dict(size=14, color='#003366'),
+                    gridcolor='rgba(145, 191, 219, 0.3)',
+                    gridwidth=1,
+                ),
+                legend=dict(
+                    title_font=dict(size=16, color='#003366'),
+                    font=dict(size=14, color='#003366'),
+                    bgcolor='#F0F2F5',
+                )
+            )
+
+            st.plotly_chart(fig_evolucion, use_container_width=True)
 
 
 with col_pie:
     with st.container():
         st.markdown("### Homicidios según sexo")
 
-        # ✅ Agrupar por sexo directamente
         sexo_data = df_filtrado.groupby('sexo')['cantidad'].sum().reset_index()
 
         if not sexo_data.empty:
-            # ✅ Calcular porcentaje
+            orden_sexo = [s for s in ["Mujer", "Hombre"] if s in sexo_data['sexo'].values]
+            sexo_data = sexo_data.set_index('sexo').loc[orden_sexo].reset_index()
+
             total = sexo_data['cantidad'].sum()
             sexo_data['porcentaje_val'] = (sexo_data['cantidad'] / total * 100).round(1)
             sexo_data['etiqueta'] = sexo_data['porcentaje_val'].astype(str) + '%'
 
-            # Paleta personalizada (ya con nombres bonitos)
-            color_scale = alt.Scale(
-                domain=["Femenino", "Masculino"],
-                range=["#00AEEF", "#F39200"]
+            fig_sexo = px.pie(
+                sexo_data,
+                values='cantidad',
+                names='sexo',
+                color='sexo',
+                color_discrete_map={
+                    "Mujer": "#00AEEF",
+                    "Hombre": "#F39200"
+                },
+                category_orders={'sexo': ["Mujer", "Hombre"]},
+                custom_data=['etiqueta', 'cantidad'],
+                height=350
             )
 
-            base = alt.Chart(sexo_data).encode(
-                theta=alt.Theta("cantidad:Q"),
-                color=alt.Color("sexo:N", scale=color_scale, title="Sexo"),
-                tooltip=[
-                    alt.Tooltip("sexo:N", title="Sexo"),
-                    alt.Tooltip("cantidad:Q", title="Cantidad"),
-                    alt.Tooltip("etiqueta:N", title="Porcentaje")
-                ]
+            fig_sexo.update_traces(
+                textposition='inside',
+                textinfo='percent',
+                textfont_size=24,
+                textfont_color='#003366',
+                textfont_family='Inter, sans-serif',
+                hovertemplate='<b>%{label}</b><br>Cantidad= %{value}<br>Porcentaje= %{customdata[0]}<extra></extra>'
             )
 
-            donut = base.mark_arc(innerRadius=60)
-
-            texto = base.mark_text(
-                radius=85,
-                size=22,
-                font='Inter',
-                fontWeight='bold',
-                align='center',
-                baseline='middle'
-            ).encode(
-                text="etiqueta:N",
-                color=alt.value("#003366")
+            fig_sexo.update_layout(
+                paper_bgcolor='white',
+                plot_bgcolor='white',
+                font=dict(family='Inter, sans-serif', color='#003366'),
+                margin=dict(t=30, r=10, b=50, l=50),
+                legend=dict(
+                    title='Sexo:',
+                    title_font=dict(size=16, color='#003366'),
+                    font=dict(size=14, color='#003366'),
+                    bgcolor='#F0F2F5',
+                )
             )
 
-            chart_final = (donut + texto).configure_view(stroke=None)
-            st.altair_chart(aplicar_estilo_altair(chart_final), use_container_width=True)
-
+            st.plotly_chart(fig_sexo, use_container_width=True)
         else:
-            st.warning("⚠️ No hay datos disponibles para el gráfico de sexo con los filtros aplicados.")
-
+            st.markdown("""
+            <div style="background-color: #FFEBE6; border-left: 5px solid #FF6F61; padding: 12px; border-radius: 8px; color: #8B0000; font-weight: 600;">
+                ⚠️ No hay datos disponibles para el filtro seleccionado.
+            </div>
+            """, unsafe_allow_html=True)
 
 # =====================
 # TABLA FINAL
 # =====================
-with st.expander("📋 Ver tabla de datos filtrados"):
-    st.dataframe(df_filtrado)
+# with st.expander("📋 Ver tabla de datos filtrados"):
+#     st.dataframe(df_filtrado)
+    
+
+    # 🔹 Pie de página personalizado
+st.markdown(f"""
+    <div style="margin-top: 40px; text-align: right; font-size: 14px; color: #666;">
+        Fuente de datos: <strong>SINADEF - Sistema Informático Nacional de Defunciones</strong><br>
+        Para mayor información o consulta, escríbenos a <strong>xxxxxxx@cientifica.edu.pe</strong>.<br>
+        Fecha de actualización: {pd.Timestamp.today().strftime('%d/%m/%Y')}
+    </div>
+    """, unsafe_allow_html=True)    
