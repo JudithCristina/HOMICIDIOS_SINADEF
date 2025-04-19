@@ -50,8 +50,10 @@ st.markdown("""
     h3 { font-size: 20px !important; }
     h4, label { font-size: 18px !important; }
     p{
-        font-size: 18px!important
+        font-size: 16px!important
+        color: white !important
     }
+    
     section[data-testid="stSidebar"] {
         background-color: #005EB8 !important;
         border-right: 2px solid #00AEEF;
@@ -71,7 +73,7 @@ st.markdown("""
     .stSelectbox div, .stMultiSelect div, .stTextInput input {
         color: white !important;
         font-weight: 700 !important;
-        font-size: 15px !important;
+        font-size: 14px!important;
         font-family: 'Inter', sans-serif !important;
     }
     .stMultiSelect div[data-baseweb="tag"],
@@ -210,11 +212,10 @@ with st.sidebar:
             lunes_actual = hoy - pd.Timedelta(days=hoy.weekday())  # lunes de esta semana
             fecha_inicio_default = lunes_actual - pd.Timedelta(days=7)  # lunes anterior
             fecha_fin_default = fecha_inicio_default + pd.Timedelta(days=6)  # domingo anterior
-
             with col1:
                 fecha_inicio = st.date_input("Fecha de inicio", value=fecha_inicio_default, max_value=hoy)
             with col2:
-                fecha_fin = st.date_input("Fecha de fin", value=fecha_fin_default, min_value=fecha_inicio, max_value=hoy)
+                fecha_fin = st.date_input("Fecha de fin", value=fecha_fin_default,  max_value=hoy)
 
             año_inicio = año_fin = rango_reciente = None
 
