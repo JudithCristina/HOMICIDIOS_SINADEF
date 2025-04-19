@@ -349,7 +349,6 @@ with col_causa:
     if tipo_filtro_tiempo == "Por calendario":
         st.markdown("### Causas de muerte según periodo seleccionado")
 
-        # Convertir fechas
         fecha_inicio_dt = pd.to_datetime(fecha_inicio)
         fecha_fin_dt = pd.to_datetime(fecha_fin)
 
@@ -360,6 +359,7 @@ with col_causa:
             (df["causa_muerte"].isin(causa_sel)) &
             (df["edad"].isin(edad_sel))
         ].copy()
+
         if df_filtrado_calendario.empty:
             st.markdown("""
             <div style="background-color: #FFEBE6; border-left: 5px solid #FF6F61; padding: 12px; border-radius: 8px; color: #8B0000; font-weight: 600;">
@@ -368,12 +368,10 @@ with col_causa:
             """, unsafe_allow_html=True)
         else:
             if fecha_inicio_dt.year != fecha_fin_dt.year:
-                # Visualizar por año
                 df_filtrado_calendario["tiempo"] = df_filtrado_calendario["fecha"].dt.year.astype(str)
                 orden_x = sorted(df_filtrado_calendario["tiempo"].unique())
 
             elif fecha_inicio_dt.month != fecha_fin_dt.month:
-                # Visualizar por mes
                 df_filtrado_calendario["tiempo"] = df_filtrado_calendario["fecha"].dt.strftime('%B %Y')
                 orden_x = sorted(
                     df_filtrado_calendario["fecha"].dt.to_period("M").drop_duplicates().sort_values()
@@ -382,7 +380,6 @@ with col_causa:
                 )
 
             else:
-                # Visualizar por día
                 df_filtrado_calendario["tiempo"] = df_filtrado_calendario["fecha"].dt.strftime('%d/%m/%Y')
                 orden_x = sorted(df_filtrado_calendario["tiempo"].unique(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'))
 
@@ -425,12 +422,35 @@ with col_causa:
         orden_x = sorted(df_filtrado["tiempo"].unique())
         causa_tiempo = df_filtrado.groupby(['tiempo', 'causa_muerte'])['cantidad'].sum().reset_index()
 
-    # Solo si existe causa_tiempo
+    # Solo si hay datos
     if 'causa_tiempo' in locals() and not causa_tiempo.empty:
-        causas_unicas = causa_tiempo['causa_muerte'].unique()
-        colores_causa = ['#90A4AE', '#00AEEF', '#005EB8', '#F39200']
-        color_map = {causa: colores_causa[i % len(colores_causa)] for i, causa in enumerate(causas_unicas)}
+        # 👉 Ordenar causas y poner "arma de fuego" primero
+        orden_causas = (
+            causa_tiempo.groupby('causa_muerte')['cantidad']
+            .sum()
+            .sort_values()
+            .index
+            .tolist()
+        )
+        if "Arma de fuego" in orden_causas:
+            orden_causas.remove("Arma de fuego")
+        orden_causas = ["Arma de fuego"] + orden_causas
 
+        # 👉 Aplicar orden categórico para apilar correctamente
+        causa_tiempo["causa_muerte"] = pd.Categorical(
+            causa_tiempo["causa_muerte"],
+            categories=orden_causas,
+            ordered=True
+        )
+
+        # 🎨 Paleta personalizada (respetando los colores del gráfico original)
+        color_map = {
+            "Arma blanca": "#90A4AE",
+            "Arma de fuego": "#00AEEF", 
+            "Asfixia": "#005EB8",
+            "Otra causa": "#F39200"             
+        }
+        # 📊 Gráfico
         fig_causa = px.bar(
             causa_tiempo,
             x='tiempo',
@@ -441,7 +461,10 @@ with col_causa:
                 'cantidad': 'Número de Homicidios',
                 'causa_muerte': 'Causa de muerte'
             },
-            category_orders={'tiempo': orden_x},
+            category_orders={
+                'tiempo': orden_x,
+                'causa_muerte': orden_causas
+            },
             color_discrete_map=color_map,
             height=350
         )
@@ -473,6 +496,7 @@ with col_causa:
         )
 
         st.plotly_chart(fig_causa, use_container_width=True)
+
     elif tipo_filtro_tiempo != "Por calendario":
         st.markdown("""
             <div style="background-color: #FFEBE6; border-left: 5px solid #FF6F61; padding: 12px; border-radius: 8px; color: #8B0000; font-weight: 600;">
@@ -733,8 +757,22 @@ with col_linea:
                 )
             else:
                 causas_unicas = evolucion['causa_muerte'].unique()
-                colores_causa = ['#90A4AE', '#00AEEF', '#005EB8', '#F39200']
-                color_map = {causa: colores_causa[i % len(colores_causa)] for i, causa in enumerate(causas_unicas)}
+
+                # 👉 Ordenar la leyenda como se desea
+                orden_causas = ["Arma de fuego", "Asfixia", "Arma blanca", "Otra causa"]
+                evolucion["causa_muerte"] = pd.Categorical(
+                    evolucion["causa_muerte"],
+                    categories=orden_causas,
+                    ordered=True
+                )
+                evolucion = evolucion.sort_values(by=["causa_muerte", "tiempo"])
+                
+                color_map = {
+                    "Arma de fuego": "#00AEEF",
+                    "Asfixia": "#005EB8",
+                    "Arma blanca": "#90A4AE",
+                    "Otra causa": "#F39200"
+                }
 
                 fig_evolucion = px.line(
                     evolucion,
@@ -753,7 +791,7 @@ with col_linea:
                     mode='lines+markers' + ('+text' if mostrar_valores else ''),
                     marker=dict(size=7),
                     line_width=1,
-                )
+                )       
 
             fig_evolucion.update_layout(
                 paper_bgcolor='white',
@@ -781,7 +819,8 @@ with col_linea:
                     title_font=dict(size=16, color='#003366'),
                     font=dict(size=14, color='#003366'),
                     bgcolor='#F0F2F5',
-                )
+                ),
+                legend_traceorder='normal'
             )
 
             st.plotly_chart(fig_evolucion, use_container_width=True)
@@ -844,13 +883,6 @@ with col_pie:
                 ⚠️ No hay datos disponibles para el filtro seleccionado.
             </div>
             """, unsafe_allow_html=True)
-
-# =====================
-# TABLA FINAL
-# =====================
-# with st.expander("📋 Ver tabla de datos filtrados"):
-#     st.dataframe(df_filtrado)
-    
 
     # 🔹 Pie de página personalizado
 st.markdown(f"""
