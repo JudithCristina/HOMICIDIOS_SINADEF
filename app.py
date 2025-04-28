@@ -889,6 +889,6 @@ st.markdown(f"""
     <div style="margin-top: 40px; text-align: right; font-size: 14px; color: #666;">
         Fuente de datos: <strong>SINADEF - Sistema Informático Nacional de Defunciones</strong><br>
         Para mayor información o consulta, escríbenos a <strong>xxxxxxx@cientifica.edu.pe</strong>.<br>
-        Fecha de actualización: <b>{fecha_actualizacion}</b>
+        Fecha de ultima actualización: <b>{fecha_actualizacion}</b>
     </div>
     """, unsafe_allow_html=True)    
